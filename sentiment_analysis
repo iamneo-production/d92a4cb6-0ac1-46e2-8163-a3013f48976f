@@ -1,0 +1,88 @@
+
+
+import numpy as np
+from textblob import TextBlob
+# import vader
+import re
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from pattern.web import Twitter
+import pandas as pd
+
+
+twitter = Twitter(language='en') 
+list1=[]
+for tweet in twitter.search('"sensex"', count=100, cached=False):
+
+    list1.append(tweet.text)
+tweett= {
+    'tweets':list1
+          }
+df=pd.DataFrame(tweett)
+
+
+
+def getSubjectivity(text):
+    return TextBlob(text).sentiment.subjectivity
+
+def getPolarity(text):
+    return TextBlob(text).sentiment.polarity
+
+df['Subjectivity'] = df['tweets'].apply(getSubjectivity)
+df['Polarity'] = df['tweets'].apply(getPolarity)
+
+
+def getSIA(text):
+    sia = SentimentIntensityAnalyzer()
+    sentiment = sia.polarity_scores(text)
+    return sentiment
+
+compound = []
+neg = []
+pos = []
+neu = []
+label=[]
+SIA = 0
+
+for i in range(0,len(df['tweets'])):
+    SIA = getSIA(df['tweets'][i])
+    compound.append(SIA['compound'])
+    neg.append(SIA['neg'])
+    neu.append(SIA['neu'])
+    pos.append(SIA['pos'])
+#Store the sentiment scores in the df data set
+df['Compound'] = compound
+df['Negative'] = neg
+df[ 'Neutral'] = neu
+df[ 'Positive'] = pos
+#Show the df data
+# df.head(3)
+df['Label'] = 0
+df.loc[df['Compound'] > 0.4, 'Label'] = 1
+df.loc[df['Compound'] < -0.1, 'Label'] = -1
+# df.head()
+
+"""# train the tweets data
+"""
+
+keep_columns = ['Subjectivity','Polarity','Compound','Negative','Neutral', 'Positive', 'Label'] #'Open','High','Low','Volume',
+df['pred Label'] = 0
+df = df [keep_columns]
+df
+#Create the feature data set
+X = df
+X= np.array(X.drop(['Label'], 1))
+#Create the target data set
+y= np.array(df['Label'])
+#Split the data into 80% training and 20% testing data sets
+x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state= 0)
+#Create and train the model
+model = LinearDiscriminantAnalysis().fit(x_train, y_train)
+#Show the models predictions
+predictions = model.predict(x_test)
+predictions
+y_test
+#Show the model metrics
+print( classification_report (y_test, predictions))
